@@ -85,7 +85,13 @@ namespace Password_manager
 
                     // Хеширование пароля
                     string passwordHash = PasswordHasher.HashPassword(password);
+                    byte[] masterKey = PasswordEncryptor.DeriveKeyFromPassword(password);
 
+                    
+                    // Для простоты сохраняем ключ в зашифрованном виде с использованием того же пароля
+                    string encryptedMasterKey = PasswordEncryptor.Encrypt(
+                        Convert.ToBase64String(masterKey),
+                        masterKey); 
                     // Создание нового пользователя
                     var newUser = new User
                     {
@@ -104,7 +110,7 @@ namespace Password_manager
                         MessageBoxButton.OK, MessageBoxImage.Information);
 
                     // Сразу входим в систему после регистрации
-                    MainWindow mainWindow = new MainWindow(newUser.Id);
+                    MainWindow mainWindow = new MainWindow(newUser.Id, password);
                     mainWindow.Show();
                     this.Close();
                 }

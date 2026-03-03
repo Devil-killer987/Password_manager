@@ -55,19 +55,23 @@ namespace Password_manager
 
                 using (var db = new AppDbContext())
                 {
-                    // Ищем пользователя по имени
                     var user = db.Users.FirstOrDefault(u => u.Name == username);
 
                     if (user != null)
                     {
-                        // Проверяем пароль с использованием BCrypt
                         if (PasswordHasher.VerifyPassword(password, user.PasswordHash))
                         {
-                            // Обновляем дату последнего входа
+                            // Восстанавливаем мастер-ключ из пароля пользователя
+                            byte[] masterKey = PasswordEncryptor.DeriveKeyFromPassword(password);
+
+                            // Сохраняем ключ в статической переменной или передаем через параметры
+                            // Для простоты будем передавать в MainWindow пароль для расшифровки
+
                             user.LastLoginAt = DateTime.Now;
                             db.SaveChanges();
 
-                            MainWindow mainWindow = new MainWindow(user.Id);
+                            // Передаем пароль пользователя в MainWindow для расшифровки
+                            MainWindow mainWindow = new MainWindow(user.Id, password);
                             mainWindow.Show();
                             this.Close();
                         }

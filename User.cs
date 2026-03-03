@@ -10,13 +10,16 @@ namespace Manager_password
     {
         public int Id { get; set; }
         public string Name { get; set; }
-        public string PasswordHash { get; set; } 
+        public string PasswordHash { get; set; }
         public string Email { get; set; }
         public DateTime CreatedAt { get; set; }
-        public DateTime? LastLoginAt { get; set; } // Дата последнего входа
-        public bool IsActive { get; set; } = true; // Активен ли аккаунт
+        public DateTime? LastLoginAt { get; set; }
+        public bool IsActive { get; set; } = true;
 
-        // Навигационное свойство для связанных паролей
+        // Зашифрованный мастер-ключ для шифрования паролей
+        public string EncryptedMasterKey { get; set; }
+
+        // Навигационное свойство
         public ICollection<PasswordEntry> PasswordEntries { get; set; }
     }
 
@@ -31,10 +34,11 @@ namespace Manager_password
         public string Notes { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public int AccessCount { get; set; } // Счетчик доступа к паролю
-        public DateTime? LastAccessedAt { get; set; } // Дата последнего доступа
+        public int AccessCount { get; set; }
+        public DateTime? LastAccessedAt { get; set; }
 
         // Навигационное свойство
         public User User { get; set; }
     }
 }
+

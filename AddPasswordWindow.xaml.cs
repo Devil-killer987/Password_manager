@@ -20,13 +20,16 @@ namespace Password_manager
     /// </summary>
     public partial class AddPasswordWindow : Window
     {
+
         private int _userId;
+        private byte[] _masterKey;
         private PasswordEntry _editingEntry;
 
-        public AddPasswordWindow(int userId, PasswordEntry entry = null)
+        public AddPasswordWindow(int userId, byte[] masterKey, PasswordEntry entry = null)
         {
             InitializeComponent();
             _userId = userId;
+            _masterKey = masterKey;
             _editingEntry = entry;
 
             if (entry != null)
@@ -35,12 +38,11 @@ namespace Password_manager
                 btnSave.Content = "Обновить";
                 txtTitle.Text = entry.Title;
                 txtUsername.Text = entry.Username;
-                txtPassword.Password = entry.EncryptedPassword;
+                txtPassword.Password = entry.EncryptedPassword; // Здесь уже расшифрованный пароль
                 txtWebsite.Text = entry.Website;
                 txtNotes.Text = entry.Notes;
             }
         }
-
         private void GeneratePassword_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -61,6 +63,26 @@ namespace Password_manager
             }
         }
 
+        
+
+        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                this.DragMove();
+        }
+
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -73,35 +95,24 @@ namespace Password_manager
 
                 if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
                 {
-                    MessageBox.Show("Пожалуйста, заполните обязательные поля (Название, Логин, Пароль)",
+                    MessageBox.Show("Пожалуйста, заполните обязательные поля",
                         "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
-                }
-
-                // Опционально можно проверять сложность пароля
-                if (password.Length < 8)
-                {
-                    var result = MessageBox.Show(
-                        "Пароль слишком короткий. Рекомендуется использовать пароль длиннее 8 символов.\n\nВсё равно сохранить?",
-                        "Предупреждение",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning);
-
-                    if (result == MessageBoxResult.No)
-                        return;
                 }
 
                 using (var db = new AppDbContext())
                 {
                     if (_editingEntry == null)
                     {
-                        // Добавление нового пароля
+                        // Шифруем пароль перед сохранением
+                        string encryptedPassword = PasswordEncryptor.Encrypt(password, _masterKey);
+
                         var newEntry = new PasswordEntry
                         {
                             UserId = _userId,
                             Title = title,
                             Username = username,
-                            EncryptedPassword = password, // В реальном проекте здесь должно быть шифрование
+                            EncryptedPassword = encryptedPassword, // Сохраняем зашифрованным
                             Website = website,
                             Notes = notes,
                             CreatedAt = DateTime.Now,
@@ -112,18 +123,17 @@ namespace Password_manager
                         db.PasswordEntries.Add(newEntry);
                         db.SaveChanges();
 
-                        MessageBox.Show("Пароль успешно добавлен!", "Успех",
+                        MessageBox.Show("Пароль успешно добавлен и зашифрован!", "Успех",
                             MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
-                        // Обновление существующего
                         var entry = db.PasswordEntries.Find(_editingEntry.Id);
                         if (entry != null)
                         {
                             entry.Title = title;
                             entry.Username = username;
-                            entry.EncryptedPassword = password;
+                            entry.EncryptedPassword = PasswordEncryptor.Encrypt(password, _masterKey);
                             entry.Website = website;
                             entry.Notes = notes;
                             entry.UpdatedAt = DateTime.Now;
@@ -144,24 +154,6 @@ namespace Password_manager
                 MessageBox.Show($"Ошибка при сохранении: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
-
-        private void BtnCancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-            Close();
-        }
-
-        private void BtnClose_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-            Close();
-        }
-
-        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-                this.DragMove();
         }
     }
 }
