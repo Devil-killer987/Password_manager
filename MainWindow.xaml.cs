@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Password_manager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,40 +23,124 @@ namespace Manager_password
     /// </summary>
     public partial class MainWindow : Window
     {
-        public MainWindow()
+        private int _currentUserId;
+
+        public MainWindow(int userId)
         {
             InitializeComponent();
-            loadcomb();
+            _currentUserId = userId;
+            LoadPasswords();
         }
 
-        private void AddProfile_Click(object sender, RoutedEventArgs e)
-        {
-            Window window = new addProf();
-            window.Show();
-            this.Close();
-        }
-        private void loadcomb()
+        private void LoadPasswords(string searchText = "")
         {
             using (var db = new AppDbContext())
             {
-                try
+                var query = db.PasswordEntries
+                    .Where(p => p.UserId == _currentUserId);
+
+                if (!string.IsNullOrEmpty(searchText))
                 {
-                    db.Database.EnsureCreated();
-
-                    // Загружаем всех пользователей
-                    var users = db.Users
-                        .OrderBy(u => u.Name)
-                        .ToList();
-
-                    // Привязываем к ComboBox
-                    nameProfile.ItemsSource = users;
-                    nameProfile.DisplayMemberPath = "Name"; // Отображаем имя
-                    nameProfile.SelectedValuePath = "Id";
+                    query = query.Where(p =>
+                        p.Title.Contains(searchText) ||
+                        p.Username.Contains(searchText) ||
+                        p.Website.Contains(searchText));
                 }
-                catch { }
-                          
+
+                PasswordsList.ItemsSource = query
+                    .OrderByDescending(p => p.UpdatedAt)
+                    .ToList();
+            }
+        }
+
+        private void AddPassword_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new AddPasswordWindow(_currentUserId);
+            if (dialog.ShowDialog() == true)
+            {
+                LoadPasswords();
+            }
+        }
+
+        private void EditPassword_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var passwordEntry = button?.DataContext as PasswordEntry;
+
+            if (passwordEntry != null)
+            {
+                var dialog = new AddPasswordWindow(_currentUserId, passwordEntry);
+                if (dialog.ShowDialog() == true)
+                {
+                    LoadPasswords();
                 }
             }
         }
+
+        private void DeletePassword_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var passwordEntry = button?.DataContext as PasswordEntry;
+
+            if (passwordEntry != null)
+            {
+                var result = MessageBox.Show(
+                    $"Вы уверены, что хотите удалить пароль для '{passwordEntry.Title}'?",
+                    "Подтверждение удаления",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    using (var db = new AppDbContext())
+                    {
+                        var entry = db.PasswordEntries.Find(passwordEntry.Id);
+                        if (entry != null)
+                        {
+                            db.PasswordEntries.Remove(entry);
+                            db.SaveChanges();
+                            LoadPasswords();
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ShowPassword_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var passwordEntry = button?.DataContext as PasswordEntry;
+
+            if (passwordEntry != null)
+            {
+                MessageBox.Show(
+                    $"Пароль для {passwordEntry.Title}: {passwordEntry.EncryptedPassword}",
+                    "Пароль",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            LoadPasswords(SearchBox.Text);
+        }
+
+        private void Logout_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Вы уверены, что хотите выйти?",
+                "Выход",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                var loginWindow = new LoginWindow();
+                loginWindow.Show();
+                this.Close();
+            }
+        }
     }
+}
 
