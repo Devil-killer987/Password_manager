@@ -27,79 +27,92 @@ namespace Password_manager
 
         private void BtnRegister_Click(object sender, RoutedEventArgs e)
         {
-            string username = txtUsername.Text.Trim();
-            string email = txtEmail.Text.Trim();
-            string password = txtPassword.Password;
-            string confirmPassword = txtConfirmPassword.Password;
-
-            // Валидация
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) ||
-                string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirmPassword))
+            try
             {
-                MessageBox.Show("Пожалуйста, заполните все поля", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+                string username = txtUsername.Text.Trim();
+                string email = txtEmail.Text.Trim();
+                string password = txtPassword.Password;
+                string confirmPassword = txtConfirmPassword.Password;
 
-            if (password != confirmPassword)
-            {
-                MessageBox.Show("Пароли не совпадают", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (password.Length < 6)
-            {
-                MessageBox.Show("Пароль должен содержать минимум 6 символов", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (!IsValidEmail(email))
-            {
-                MessageBox.Show("Введите корректный email адрес", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            using (var db = new AppDbContext())
-            {
-                db.Database.EnsureCreated();
-
-                // Проверка существования пользователя
-                if (db.Users.Any(u => u.Name == username))
+                // Валидация
+                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) ||
+                    string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirmPassword))
                 {
-                    MessageBox.Show("Пользователь с таким именем уже существует", "Ошибка",
+                    MessageBox.Show("Пожалуйста, заполните все поля", "Ошибка",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                if (db.Users.Any(u => u.Email == email))
+                if (password != confirmPassword)
                 {
-                    MessageBox.Show("Пользователь с таким email уже существует", "Ошибка",
+                    MessageBox.Show("Пароли не совпадают", "Ошибка",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                // Создание нового пользователя
-                var newUser = new User
+                // Проверка сложности пароля
+                var strengthCheck = PasswordHasher.ValidatePasswordStrength(password);
+                if (!strengthCheck.IsValid)
                 {
-                    Name = username,
-                    Email = email,
-                    Password = password, // В реальном проекте нужно хешировать!
-                    CreatedAt = DateTime.Now
-                };
+                    MessageBox.Show($"Пароль недостаточно надежный:\n{strengthCheck.Message}",
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
 
-                db.Users.Add(newUser);
-                db.SaveChanges();
+                if (!IsValidEmail(email))
+                {
+                    MessageBox.Show("Введите корректный email адрес", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
 
-                MessageBox.Show("Регистрация прошла успешно!", "Успех",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                using (var db = new AppDbContext())
+                {
+                    // Проверка существования пользователя
+                    if (db.Users.Any(u => u.Name == username))
+                    {
+                        MessageBox.Show("Пользователь с таким именем уже существует", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
 
-                // Возврат на окно входа
-                LoginWindow loginWindow = new LoginWindow();
-                loginWindow.Show();
-                this.Close();
+                    if (db.Users.Any(u => u.Email == email))
+                    {
+                        MessageBox.Show("Пользователь с таким email уже существует", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    // Хеширование пароля
+                    string passwordHash = PasswordHasher.HashPassword(password);
+
+                    // Создание нового пользователя
+                    var newUser = new User
+                    {
+                        Name = username,
+                        Email = email,
+                        PasswordHash = passwordHash, // Сохраняем хеш
+                        CreatedAt = DateTime.Now,
+                        IsActive = true,
+                        PasswordEntries = new System.Collections.Generic.List<PasswordEntry>()
+                    };
+
+                    db.Users.Add(newUser);
+                    db.SaveChanges();
+
+                    MessageBox.Show("Регистрация прошла успешно!", "Успех",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    // Сразу входим в систему после регистрации
+                    MainWindow mainWindow = new MainWindow(newUser.Id);
+                    mainWindow.Show();
+                    this.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при регистрации: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

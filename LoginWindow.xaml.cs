@@ -23,37 +23,71 @@ namespace Password_manager
         public LoginWindow()
         {
             InitializeComponent();
+
+            // Создание базы данных при первом запуске
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    db.Database.EnsureCreated();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при создании базы данных: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void BtnLogin_Click(object sender, RoutedEventArgs e)
         {
-            string username = txtUsername.Text.Trim();
-            string password = txtPassword.Password;
-
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            try
             {
-                MessageBox.Show("Пожалуйста, заполните все поля", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                string username = txtUsername.Text.Trim();
+                string password = txtPassword.Password;
+
+                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                {
+                    MessageBox.Show("Пожалуйста, заполните все поля", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                using (var db = new AppDbContext())
+                {
+                    // Ищем пользователя по имени
+                    var user = db.Users.FirstOrDefault(u => u.Name == username);
+
+                    if (user != null)
+                    {
+                        // Проверяем пароль с использованием BCrypt
+                        if (PasswordHasher.VerifyPassword(password, user.PasswordHash))
+                        {
+                            // Обновляем дату последнего входа
+                            user.LastLoginAt = DateTime.Now;
+                            db.SaveChanges();
+
+                            MainWindow mainWindow = new MainWindow(user.Id);
+                            mainWindow.Show();
+                            this.Close();
+                        }
+                        else
+                        {
+                            MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
             }
-
-            using (var db = new AppDbContext())
+            catch (Exception ex)
             {
-                db.Database.EnsureCreated();
-
-                var user = db.Users.FirstOrDefault(u => u.Name == username && u.Password == password);
-
-                if (user != null)
-                {
-                    MainWindow mainWindow = new MainWindow(user.Id);
-                    mainWindow.Show();
-                    this.Close();
-                }
-                else
-                {
-                    MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                MessageBox.Show($"Ошибка при входе: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

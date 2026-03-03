@@ -44,6 +44,12 @@ namespace Manager_password
             // Индекс для быстрого поиска по UserId
             modelBuilder.Entity<PasswordEntry>()
                 .HasIndex(p => p.UserId);
+
+            // Индекс для поиска по заголовку
+            modelBuilder.Entity<PasswordEntry>()
+                .HasIndex(p => p.Title);
+
+            
         }
     }
 }

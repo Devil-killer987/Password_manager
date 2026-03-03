@@ -22,7 +22,6 @@ namespace Password_manager
     {
         private int _userId;
         private PasswordEntry _editingEntry;
-        private Random _random = new Random();
 
         public AddPasswordWindow(int userId, PasswordEntry entry = null)
         {
@@ -36,7 +35,7 @@ namespace Password_manager
                 btnSave.Content = "Обновить";
                 txtTitle.Text = entry.Title;
                 txtUsername.Text = entry.Username;
-                txtPassword.Password = entry.EncryptedPassword; // В реальном проекте нужно дешифровать
+                txtPassword.Password = entry.EncryptedPassword;
                 txtWebsite.Text = entry.Website;
                 txtNotes.Text = entry.Notes;
             }
@@ -44,68 +43,107 @@ namespace Password_manager
 
         private void GeneratePassword_Click(object sender, RoutedEventArgs e)
         {
-            // Простая генерация пароля
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-            var password = new string(Enumerable.Repeat(chars, 12)
-                .Select(s => s[_random.Next(s.Length)]).ToArray());
+            try
+            {
+                // Используем улучшенный генератор паролей
+                string password = PasswordHasher.GenerateStrongPassword(16);
+                txtPassword.Password = password;
 
-            txtPassword.Password = password;
+                // Показываем информацию о пароле
+                var strengthCheck = PasswordHasher.ValidatePasswordStrength(password);
+                MessageBox.Show($"Сгенерирован надежный пароль!\n\nПароль: {password}\n\n{strengthCheck.Message}",
+                    "Генератор паролей", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при генерации пароля: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            string title = txtTitle.Text.Trim();
-            string username = txtUsername.Text.Trim();
-            string password = txtPassword.Password;
-            string website = txtWebsite.Text.Trim();
-            string notes = txtNotes.Text.Trim();
-
-            if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            try
             {
-                MessageBox.Show("Пожалуйста, заполните обязательные поля (Название, Логин, Пароль)",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+                string title = txtTitle.Text.Trim();
+                string username = txtUsername.Text.Trim();
+                string password = txtPassword.Password;
+                string website = txtWebsite.Text.Trim();
+                string notes = txtNotes.Text.Trim();
 
-            using (var db = new AppDbContext())
-            {
-                if (_editingEntry == null)
+                if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
                 {
-                    // Добавление нового пароля
-                    var newEntry = new PasswordEntry
-                    {
-                        UserId = _userId,
-                        Title = title,
-                        Username = username,
-                        EncryptedPassword = password, // В реальном проекте нужно шифровать!
-                        Website = website,
-                        Notes = notes,
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now
-                    };
-
-                    db.PasswordEntries.Add(newEntry);
+                    MessageBox.Show("Пожалуйста, заполните обязательные поля (Название, Логин, Пароль)",
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
-                else
+
+                // Опционально можно проверять сложность пароля
+                if (password.Length < 8)
                 {
-                    // Обновление существующего
-                    var entry = db.PasswordEntries.Find(_editingEntry.Id);
-                    if (entry != null)
+                    var result = MessageBox.Show(
+                        "Пароль слишком короткий. Рекомендуется использовать пароль длиннее 8 символов.\n\nВсё равно сохранить?",
+                        "Предупреждение",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+
+                    if (result == MessageBoxResult.No)
+                        return;
+                }
+
+                using (var db = new AppDbContext())
+                {
+                    if (_editingEntry == null)
                     {
-                        entry.Title = title;
-                        entry.Username = username;
-                        entry.EncryptedPassword = password; // В реальном проекте нужно шифровать!
-                        entry.Website = website;
-                        entry.Notes = notes;
-                        entry.UpdatedAt = DateTime.Now;
+                        // Добавление нового пароля
+                        var newEntry = new PasswordEntry
+                        {
+                            UserId = _userId,
+                            Title = title,
+                            Username = username,
+                            EncryptedPassword = password, // В реальном проекте здесь должно быть шифрование
+                            Website = website,
+                            Notes = notes,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now,
+                            AccessCount = 0
+                        };
+
+                        db.PasswordEntries.Add(newEntry);
+                        db.SaveChanges();
+
+                        MessageBox.Show("Пароль успешно добавлен!", "Успех",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        // Обновление существующего
+                        var entry = db.PasswordEntries.Find(_editingEntry.Id);
+                        if (entry != null)
+                        {
+                            entry.Title = title;
+                            entry.Username = username;
+                            entry.EncryptedPassword = password;
+                            entry.Website = website;
+                            entry.Notes = notes;
+                            entry.UpdatedAt = DateTime.Now;
+
+                            db.SaveChanges();
+
+                            MessageBox.Show("Пароль успешно обновлен!", "Успех",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
                     }
                 }
 
-                db.SaveChanges();
+                DialogResult = true;
+                Close();
             }
-
-            DialogResult = true;
-            Close();
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при сохранении: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
