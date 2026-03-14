@@ -100,19 +100,25 @@ namespace Password_manager
                         PasswordHash = passwordHash, // Сохраняем хеш
                         CreatedAt = DateTime.Now,
                         IsActive = true,
-                        PasswordEntries = new System.Collections.Generic.List<PasswordEntry>()
+                        PasswordEntries = new System.Collections.Generic.List<PasswordEntry>(),
+                        EncryptedMasterKey=""
                     };
+                    try
+                    {
+                        db.Users.Add(newUser);
+                        db.SaveChanges();
 
-                    db.Users.Add(newUser);
-                    db.SaveChanges();
+                        MessageBox.Show("Регистрация прошла успешно!", "Успех",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
 
-                    MessageBox.Show("Регистрация прошла успешно!", "Успех",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    // Сразу входим в систему после регистрации
-                    MainWindow mainWindow = new MainWindow(newUser.Id, password);
-                    mainWindow.Show();
-                    this.Close();
+                        // Сразу входим в систему после регистрации
+                        MainWindow mainWindow = new MainWindow(newUser.Id, password);
+                        mainWindow.Show();
+                        this.Close();
+                    }
+                    catch ( Exception ex){ 
+                             MessageBox.Show($"ошибка:{ex.Message}\n\nДетали:{ex.InnerException?.Message}");
+                    }
                 }
             }
             catch (Exception ex)

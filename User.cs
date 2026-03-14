@@ -17,7 +17,7 @@ namespace Manager_password
         public bool IsActive { get; set; } = true;
 
         // Зашифрованный мастер-ключ для шифрования паролей
-        public string EncryptedMasterKey { get; set; }
+        public string? EncryptedMasterKey { get; set; }
 
         // Навигационное свойство
         public ICollection<PasswordEntry> PasswordEntries { get; set; }
