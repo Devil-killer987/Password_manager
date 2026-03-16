@@ -17,7 +17,7 @@ namespace Manager_password
         {
             string dbPath = System.IO.Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory,
-                "password_manager.db");
+                "Base_Password_Manager.db");
 
             optionsBuilder.UseSqlite($"Data Source={dbPath}");
         }

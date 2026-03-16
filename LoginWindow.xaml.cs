@@ -57,34 +57,48 @@ namespace Password_manager
                 {
                     var user = db.Users.FirstOrDefault(u => u.Name == username);
 
-                    if (user != null)
-                    {
-                        if (PasswordHasher.VerifyPassword(password, user.PasswordHash))
-                        {
-                            // Восстанавливаем мастер-ключ из пароля пользователя
-                            byte[] masterKey = PasswordEncryptor.DeriveKeyFromPassword(password);
-
-                            // Сохраняем ключ в статической переменной или передаем через параметры
-                            // Для простоты будем передавать в MainWindow пароль для расшифровки
-
-                            user.LastLoginAt = DateTime.Now;
-                            db.SaveChanges();
-
-                            // Передаем пароль пользователя в MainWindow для расшифровки
-                            MainWindow mainWindow = new MainWindow(user.Id, password);
-                            mainWindow.Show();
-                            this.Close();
-                        }
-                        else
-                        {
-                            MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
-                    }
-                    else
+                    if (user == null)
                     {
                         MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
                             MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    // Проверяем пароль
+                    if (!PasswordHasher.VerifyPassword(password, user.PasswordHash))
+                    {
+                        MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    // Проверяем наличие мастер-ключа
+                    if (string.IsNullOrEmpty(user.EncryptedMasterKey))
+                    {
+                        MessageBox.Show("Мастер-ключ не найден. Возможно, профиль поврежден.",
+                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    // Пытаемся расшифровать мастер-ключ (это подтвердит правильность пароля)
+                    try
+                    {
+                        byte[] masterKey = PasswordEncryptor.DecryptMasterKey(user.EncryptedMasterKey, password);
+
+                        // Если расшифровка успешна, продолжаем
+                        user.LastLoginAt = DateTime.Now;
+                        db.SaveChanges();
+
+                        // Передаем ID пользователя и пароль (для расшифровки мастер-ключа в MainWindow)
+                        MainWindow mainWindow = new MainWindow(user.Id, password);
+                        mainWindow.Show();
+                        this.Close();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при расшифровке мастер-ключа: {ex.Message}\n\n" +
+                            "Возможно, пароль не совпадает или данные повреждены.",
+                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
             }
@@ -106,6 +120,36 @@ namespace Password_manager
         {
             if (e.LeftButton == MouseButtonState.Pressed)
                 this.DragMove();
+        }
+
+      
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        private void TxtUsername_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                txtPassword.Focus();
+            }
+        }
+
+        private void TxtPassword_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                BtnLogin_Click(sender, e);
+            }
+        }
+
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                BtnClose_Click(sender, e);
+            }
         }
     }
 }

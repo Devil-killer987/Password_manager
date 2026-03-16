@@ -29,15 +29,15 @@ namespace Manager_password
         public int UserId { get; set; }
         public string Title { get; set; }
         public string Username { get; set; }
-        public string EncryptedPassword { get; set; } // Здесь храним зашифрованный пароль
+        public string EncryptedPassword { get; set; }
         public string Website { get; set; }
         public string Notes { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public int AccessCount { get; set; }
         public DateTime? LastAccessedAt { get; set; }
+        public bool IsFavorite { get; set; } // Избранное
 
-        // Навигационное свойство
         public User User { get; set; }
     }
 }

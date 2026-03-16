@@ -6,19 +6,22 @@
         xmlns:local="clr-namespace:Password_manager"
         mc:Ignorable="d"
          Title="Менеджер паролей - Регистрация" 
-        Height="600" Width="400"
+        Height="650" Width="450"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         MouseDown="Window_MouseDown">
-    <Border CornerRadius="20" Background="White" Margin="10">
+
+    <Border CornerRadius="20" Background="White" Padding="25">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.3" Color="Gray"/>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.3"/>
         </Border.Effect>
 
-        <Grid Margin="30">
+        <Grid>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -28,135 +31,182 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Кнопка закрытия -->
-            <Button Content="✕" 
-                    HorizontalAlignment="Right"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    FontSize="20"
-                    Foreground="#7F8C8D"
-                    Cursor="Hand"
-                    Click="BtnClose_Click"
-                    Margin="0,-10,-10,0"/>
+            <!-- Заголовок и кнопка закрытия -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- Заголовок -->
-            <TextBlock Text="📝 Создание аккаунта" 
-                       FontSize="24" 
-                       FontWeight="Bold" 
-                       Foreground="#2C3E50"
-                       HorizontalAlignment="Center"
-                       Margin="0,10,0,20"/>
+                <TextBlock x:Name="WindowTitle" 
+                           Text="📝 Регистрация" 
+                           FontSize="20" 
+                           FontWeight="Bold" 
+                           Foreground="#2C3E50"
+                           Margin="0,0,0,20"/>
 
-            <!-- Иконка -->
-            <TextBlock Text="🔐" 
-                       FontSize="48" 
-                       HorizontalAlignment="Center"
-                       Grid.Row="1"
-                       Margin="0,0,0,20"/>
+                <Button Grid.Column="1" 
+                        Content="✕" 
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="20"
+                        Foreground="#7F8C8D"
+                        Cursor="Hand"
+                        Click="BtnClose_Click"
+                        Margin="0,-10,-10,0"/>
+            </Grid>
 
-            <!-- Поле имени -->
-            <StackPanel Grid.Row="2" Margin="0,0,0,15">
+            <!-- Имя пользователя -->
+            <StackPanel Grid.Row="1" Margin="0,0,0,15">
                 <TextBlock Text="Имя пользователя" 
                            Foreground="#34495E" 
                            Margin="0,0,0,5"
                            FontSize="14"/>
                 <TextBox x:Name="txtUsername" 
-                         Height="40" 
-                         FontSize="14"
+                         Height="35" 
                          Padding="10,0"
                          BorderBrush="#BDC3C7"
                          BorderThickness="1"
-                         
-                         Background="#F8F9F9"/>
+                         KeyDown="TxtUsername_KeyDown"/>
             </StackPanel>
 
-            <!-- Поле email -->
-            <StackPanel Grid.Row="3" Margin="0,0,0,15">
+            <!-- Email -->
+            <StackPanel Grid.Row="2" Margin="0,0,0,15">
                 <TextBlock Text="Email" 
                            Foreground="#34495E" 
                            Margin="0,0,0,5"
                            FontSize="14"/>
                 <TextBox x:Name="txtEmail" 
-                         Height="40" 
-                         FontSize="14"
+                         Height="35" 
                          Padding="10,0"
                          BorderBrush="#BDC3C7"
                          BorderThickness="1"
-                         
-                         Background="#F8F9F9"/>
+                         KeyDown="TxtEmail_KeyDown"/>
             </StackPanel>
 
-            <!-- Поле пароля -->
-            <StackPanel Grid.Row="4" Margin="0,0,0,15">
+            <!-- Пароль -->
+            <StackPanel Grid.Row="3" Margin="0,0,0,15">
                 <TextBlock Text="Пароль" 
                            Foreground="#34495E" 
                            Margin="0,0,0,5"
                            FontSize="14"/>
-                <PasswordBox x:Name="txtPassword" 
-                             Height="40" 
-                             FontSize="14"
-                             Padding="10,0"
-                             BorderBrush="#BDC3C7"
-                             BorderThickness="1"
-                             
-                             Background="#F8F9F9"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <PasswordBox x:Name="txtPassword" 
+                                 Height="35" 
+                                 Padding="10,0"
+                                 BorderBrush="#BDC3C7"
+                                 BorderThickness="1"
+                                 PasswordChanged="TxtPassword_PasswordChanged"
+                                 KeyDown="TxtPassword_KeyDown"/>
+
+                    <Button Grid.Column="1" 
+                            x:Name="btnGeneratePassword"
+                            Content="🎲"
+                            Width="35"
+                            Height="35"
+                            Background="#3498DB"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Margin="2,0,0,0"
+                            Cursor="Hand"
+                            Click="GeneratePassword_Click"
+                            ToolTip="Сгенерировать пароль"/>
+                </Grid>
             </StackPanel>
 
-            <!-- Подтверждение пароля -->
-            <StackPanel Grid.Row="5" Margin="0,0,0,25">
+            <!-- Индикатор сложности пароля -->
+            <StackPanel Grid.Row="4" Margin="0,0,0,15">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ProgressBar x:Name="PasswordStrengthBar" 
+                                 Height="5" 
+                                 Minimum="0" 
+                                 Maximum="100"
+                                 Foreground="#4CAF50"
+                                 Background="#EEEEEE"
+                                 Grid.ColumnSpan="2"/>
+
+                    <TextBlock x:Name="PasswordStrengthText" 
+                               Grid.Column="1"
+                               FontSize="10"
+                               Margin="5,0,0,0"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- !!! ДОБАВЛЕНО: Подтверждение пароля !!! -->
+            <StackPanel Grid.Row="5" Margin="0,0,0,20">
                 <TextBlock Text="Подтверждение пароля" 
                            Foreground="#34495E" 
                            Margin="0,0,0,5"
                            FontSize="14"/>
                 <PasswordBox x:Name="txtConfirmPassword" 
-                             Height="40" 
-                             FontSize="14"
+                             Height="35" 
                              Padding="10,0"
                              BorderBrush="#BDC3C7"
                              BorderThickness="1"
-                             
-                             Background="#F8F9F9"/>
+                             PasswordChanged="TxtConfirmPassword_PasswordChanged"
+                             KeyDown="TxtConfirmPassword_KeyDown"/>
+
+                <!-- Индикатор совпадения паролей -->
+                <TextBlock x:Name="PasswordMatchText" 
+                           FontSize="11"
+                           Margin="0,3,0,0"
+                           HorizontalAlignment="Right"/>
             </StackPanel>
 
             <!-- Кнопка регистрации -->
             <Button Grid.Row="6" 
+                    x:Name="btnRegister"
                     Content="Зарегистрироваться" 
-                    Height="45"
-                    FontSize="16"
-                    FontWeight="Bold"
+                    Height="40"
                     Background="#2ECC71"
                     Foreground="White"
                     BorderThickness="0"
-                    
+                    FontSize="14"
+                    FontWeight="Bold"
                     Cursor="Hand"
                     Click="BtnRegister_Click"
-                    Margin="0,0,0,15">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Background" Value="#2ECC71"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#27AE60"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#229954"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-            </Button>
+                    IsDefault="True"/>
 
             <!-- Ссылка на вход -->
-            <TextBlock Grid.Row="6" 
-                       VerticalAlignment="Bottom"
-                       HorizontalAlignment="Center">
-                <Run Text="Уже есть аккаунт?" 
-                     Foreground="#7F8C8D"/>
-                <Hyperlink Click="LoginLink_Click"
-                          Foreground="#3498DB">
-                    Войти
-                </Hyperlink>
-            </TextBlock>
+            <StackPanel Grid.Row="7" 
+                        Margin="0,15,0,0"
+                        HorizontalAlignment="Center">
+                <TextBlock Text="Уже есть аккаунт?" 
+                           Foreground="#7F8C8D" 
+                           FontSize="12"
+                           HorizontalAlignment="Center"/>
+                <Button Content="Войти" 
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="#3498DB"
+                        FontSize="12"
+                        FontWeight="Bold"
+                        Cursor="Hand"
+                        Click="LoginLink_Click">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="#2980B9"/>
+                                    <Setter Property="TextBlock.TextDecorations" Value="Underline"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
         </Grid>
     </Border>
 </Window>

@@ -6,13 +6,15 @@
         xmlns:local="clr-namespace:Manager_password"
         mc:Ignorable="d"
         Title="Менеджер паролей" 
-        Height="600" Width="800"
+        Height="700" Width="1030"
         WindowStartupLocation="CenterScreen"
         Background="#F0F3F4">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <!-- Добавлено для статусной строки -->
         </Grid.RowDefinitions>
 
         <!-- Верхняя панель -->
@@ -37,7 +39,6 @@
                             BorderThickness="0"
                             Padding="15,8"
                             Margin="0,0,10,0"
-                            
                             Cursor="Hand"
                             Click="AddPassword_Click"/>
                     <Button Content="🚪 Выйти" 
@@ -45,7 +46,6 @@
                             Foreground="White"
                             BorderThickness="0"
                             Padding="15,8"
-                            
                             Cursor="Hand"
                             Click="Logout_Click"/>
                 </StackPanel>
@@ -96,7 +96,6 @@
                              Margin="0,0,0,15"
                              BorderBrush="#BDC3C7"
                              BorderThickness="1"
-                            
                              TextChanged="SearchBox_TextChanged">
                         <TextBox.Style>
                             <Style TargetType="TextBox">
@@ -113,7 +112,9 @@
                     <!-- Список паролей -->
                     <ListView x:Name="PasswordsList" Grid.Row="1"
                               Background="Transparent"
-                              BorderThickness="0">
+                              BorderThickness="0"
+                              MouseDoubleClick="ListView_MouseDoubleClick"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn Header="Название" Width="150" 
@@ -130,14 +131,15 @@
                                                         BorderThickness="0"
                                                         FontSize="12"
                                                         Cursor="Hand"
-                                                        Click="ShowPassword_Click"/>
+                                                        Click="ShowPassword_Click"
+                                                        Tag="{Binding Id}"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
                                 <GridViewColumn Header="Сайт" Width="150" 
                                                 DisplayMemberBinding="{Binding Website}"/>
-                                <GridViewColumn Header="Действия" Width="100">
+                                <GridViewColumn Header="Действия" Width="120">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">
@@ -146,12 +148,30 @@
                                                         BorderThickness="0"
                                                         Margin="0,0,5,0"
                                                         Cursor="Hand"
-                                                        Click="EditPassword_Click"/>
+                                                        Click="EditPassword_Click"
+                                                        Tag="{Binding Id}"/>
+                                                <Button Content="📋" 
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Margin="0,0,5,0"
+                                                        Cursor="Hand"
+                                                        Click="CopyPassword_Click"
+                                                        Tag="{Binding Id}"
+                                                        ToolTip="Копировать пароль"/>
+                                                <Button Content="👤" 
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Margin="0,0,5,0"
+                                                        Cursor="Hand"
+                                                        Click="CopyUsername_Click"
+                                                        Tag="{Binding Id}"
+                                                        ToolTip="Копировать логин"/>
                                                 <Button Content="🗑️" 
                                                         Background="Transparent"
                                                         BorderThickness="0"
                                                         Cursor="Hand"
-                                                        Click="DeletePassword_Click"/>
+                                                        Click="DeletePassword_Click"
+                                                        Tag="{Binding Id}"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
@@ -162,5 +182,29 @@
                 </Grid>
             </Border>
         </Grid>
+
+        <!-- Нижняя статусная панель (ДОБАВЛЕНО) -->
+        <Border Grid.Row="2" Background="#2C3E50" Padding="10,5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Статус текст -->
+                <TextBlock x:Name="StatusText" 
+                           Foreground="#ECF0F1" 
+                           Text="Готов к работе"
+                           VerticalAlignment="Center"/>
+
+                <!-- Информация о пользователе -->
+                <TextBlock Grid.Column="1" 
+                           x:Name="UserInfoText" 
+                           Foreground="#ECF0F1" 
+                           Text="Пользователь: "
+                           VerticalAlignment="Center"
+                           Margin="10,0,0,0"/>
+            </Grid>
+        </Border>
     </Grid>
 </Window>
