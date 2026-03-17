@@ -27,7 +27,7 @@ namespace Manager_password
         private int _currentUserId;
         private string _userPassword; // Пароль пользователя для расшифровки мастер-ключа
         private byte[] _masterKey; // Расшифрованный мастер-ключ для шифрования паролей
-
+        private List<Category> _categories;
         public MainWindow() : this(0, "")
         {
         }
@@ -53,6 +53,282 @@ namespace Manager_password
                 Close();
             }
         }
+        private void LoadCategories()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    var categories = db.Categories
+                        .Where(c => c.UserId == _currentUserId)
+                        .OrderBy(c => c.DisplayOrder)
+                        .ToList();
+
+                    // Очищаем ListBox
+                    CategoriesList.Items.Clear();
+
+                    // Добавляем "Все пароли"
+                    var allItem = new ListBoxItem
+                    {
+                        Content = "🔐 Все пароли",
+                        Tag = "all",
+                        IsSelected = true,
+                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2C3E50"))
+                    };
+                    CategoriesList.Items.Add(allItem);
+
+                    // Добавляем категории пользователя
+                    foreach (var cat in categories)
+                    {
+                        var item = new ListBoxItem
+                        {
+                            Content = $"{cat.Icon} {cat.Name}",
+                            Tag = cat.Id.ToString(),
+                            Foreground = string.IsNullOrEmpty(cat.Color)
+                                ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2C3E50"))
+                                : new SolidColorBrush((Color)ColorConverter.ConvertFromString(cat.Color))
+                        };
+                        CategoriesList.Items.Add(item);
+                    }
+
+                    // Добавляем "Без категории"
+                    var noCategoryItem = new ListBoxItem
+                    {
+                        Content = "🚫 Без категории",
+                        Tag = "none",
+                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7F8C8D"))
+                    };
+                    CategoriesList.Items.Add(noCategoryItem);
+
+                    // Добавляем разделитель
+                    var separatorItem = new ListBoxItem
+                    {
+                        Content = "──────────",
+                        Tag = "separator",
+                        IsEnabled = false,
+                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#BDC3C7"))
+                    };
+                    CategoriesList.Items.Add(separatorItem);
+
+                    // Добавляем "Управление категориями"
+                    var manageItem = new ListBoxItem
+                    {
+                        Content = "⚙️ Управление категориями",
+                        Tag = "manage",
+                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")),
+                        FontWeight = FontWeights.SemiBold
+                    };
+                    CategoriesList.Items.Add(manageItem);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки категорий: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // Добавьте обработчик выбора категории
+        private void CategoriesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CategoriesList.SelectedItem is ListBoxItem selectedItem)
+            {
+                string tag = selectedItem.Tag?.ToString();
+
+                if (tag == "manage")
+                {
+                    // Открываем окно управления категориями
+                    OpenCategoryManager();
+
+                    // Возвращаем выделение на предыдущий элемент
+                    if (e.RemovedItems.Count > 0)
+                    {
+                        CategoriesList.SelectedItem = e.RemovedItems[0];
+                    }
+                    else
+                    {
+                        // Если нечего восстанавливать, выбираем "Все пароли"
+                        foreach (ListBoxItem item in CategoriesList.Items)
+                        {
+                            if (item.Tag?.ToString() == "all")
+                            {
+                                CategoriesList.SelectedItem = item;
+                                break;
+                            }
+                        }
+                    }
+                }
+                else if (tag != "separator")
+                {
+                    // Фильтруем пароли по выбранной категории
+                    FilterByCategory(tag);
+
+                    // Обновляем статус с названием выбранной категории
+                    string categoryName = (selectedItem.Content as string)?.Split(' ').Last() ?? "категории";
+                    if (tag == "all") categoryName = "всех категорий";
+                    else if (tag == "none") categoryName = "без категории";
+
+                    StatusText.Text = $"Показаны пароли из {categoryName}";
+                }
+            }
+        }
+
+        private void OpenCategoryManager()
+        {
+            var window = new CategoryManagerWindow(_currentUserId, _masterKey);
+            window.Owner = this;
+            window.ShowDialog();
+            LoadCategories(); // Перезагружаем категории после закрытия
+        }
+
+        private void FilterByCategory(string categoryTag)
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    // Базовый запрос - только пароли текущего пользователя
+                    IQueryable<PasswordEntry> query = db.PasswordEntries
+                        .Where(p => p.UserId == _currentUserId);
+
+                    // Применяем фильтр по категории
+                    if (categoryTag == "all")
+                    {
+                        // Все пароли - без дополнительного фильтра
+                        // Ничего не делаем
+                    }
+                    else if (categoryTag == "none")
+                    {
+                        // Только пароли без категории
+                        query = query.Where(p => p.CategoryId == null);
+                    }
+                    else if (int.TryParse(categoryTag, out int categoryId))
+                    {
+                        // Пароли из выбранной категории
+                        query = query.Where(p => p.CategoryId == categoryId);
+                    }
+
+                    // Применяем поиск, если есть текст в поисковой строке
+                    if (!string.IsNullOrEmpty(SearchBox?.Text))
+                    {
+                        string search = SearchBox.Text.ToLower().Trim();
+                        query = query.Where(p =>
+                            p.Title.ToLower().Contains(search) ||
+                            p.Username.ToLower().Contains(search) ||
+                            p.Website.ToLower().Contains(search) ||
+                            p.Notes.ToLower().Contains(search));
+                    }
+
+                    // Получаем отфильтрованные пароли
+                    var passwords = query
+                        .OrderByDescending(p => p.IsFavorite)
+                        .ThenByDescending(p => p.UpdatedAt)
+                        .ToList();
+
+                    // Загружаем все категории пользователя для отображения названий
+                    var categories = db.Categories
+                        .Where(c => c.UserId == _currentUserId)
+                        .ToDictionary(c => c.Id, c => c);
+
+                    // Создаем список для отображения с расшифрованными паролями
+                    var displayList = new List<PasswordEntryDisplay>();
+
+                    foreach (var p in passwords)
+                    {
+                        try
+                        {
+                            // Расшифровываем пароль
+                            string decryptedPassword = PasswordEncryptor.Decrypt(p.EncryptedPassword, _masterKey);
+
+                            // Определяем название и цвет категории
+                            string categoryName = "🚫 Без категории";
+                            string categoryColor = "#7F8C8D"; // Серый цвет
+
+                            if (p.CategoryId.HasValue && categories.ContainsKey(p.CategoryId.Value))
+                            {
+                                var category = categories[p.CategoryId.Value];
+                                categoryName = $"{category.Icon} {category.Name}";
+                                categoryColor = category.Color ?? "#3498DB";
+                            }
+
+                            // Добавляем в список отображения
+                            displayList.Add(new PasswordEntryDisplay
+                            {
+                                Id = p.Id,
+                                Title = p.Title,
+                                Username = p.Username,
+                                DecryptedPassword = decryptedPassword,
+                                Website = p.Website,
+                                Notes = p.Notes,
+                                CreatedAt = p.CreatedAt,
+                                UpdatedAt = p.UpdatedAt,
+                                IsFavorite = p.IsFavorite,
+                                AccessCount = p.AccessCount,
+                                LastAccessedAt = p.LastAccessedAt,
+                                CategoryId = p.CategoryId,
+                                CategoryName = categoryName,
+                                CategoryColor = categoryColor
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            // Если не удалось расшифровать, добавляем запись с ошибкой
+                            displayList.Add(new PasswordEntryDisplay
+                            {
+                                Id = p.Id,
+                                Title = p.Title + " [Ошибка расшифровки]",
+                                Username = p.Username,
+                                DecryptedPassword = "*** ОШИБКА ***",
+                                Website = p.Website,
+                                Notes = $"Не удалось расшифровать: {ex.Message}",
+                                CreatedAt = p.CreatedAt,
+                                UpdatedAt = p.UpdatedAt,
+                                CategoryId = p.CategoryId,
+                                CategoryName = "⚠️ Ошибка",
+                                CategoryColor = "#E74C3C" // Красный цвет
+                            });
+                        }
+                    }
+
+                    // Обновляем список на экране
+                    PasswordsList.ItemsSource = displayList;
+
+                    // Обновляем статус
+                    StatusText.Text = $"Найдено записей: {displayList.Count}";
+
+                    // Обновляем информацию о пользователе, если нужно
+                    if (string.IsNullOrEmpty(UserInfoText.Text) || UserInfoText.Text == "Пользователь: ")
+                    {
+                        UpdateUserInfo();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при фильтрации паролей: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void UpdateUserInfo()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    var user = db.Users.Find(_currentUserId);
+                    if (user != null && !string.IsNullOrEmpty(user.EncryptedUsername))
+                    {
+                        string username = DeterministicEncryption.Decrypt(user.EncryptedUsername, _masterKey);
+                        UserInfoText.Text = $"Пользователь: {username}";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при обновлении информации о пользователе: {ex.Message}");
+            }
+        }
+
 
         /// <summary>
         /// Загрузка и расшифровка мастер-ключа из базы данных
@@ -161,6 +437,8 @@ namespace Manager_password
                             {
                                 string username = DeterministicEncryption.Decrypt(user.EncryptedUsername, _masterKey);
                                 UserInfoText.Text = $"Пользователь: {username}";
+                                LoadCategories();
+                                CategoriesList.SelectionChanged += CategoriesList_SelectionChanged;
                             }
                         }
                     }
@@ -172,6 +450,7 @@ namespace Manager_password
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private void ShowPassword_Click(object sender, RoutedEventArgs e)
         {
@@ -345,7 +624,17 @@ namespace Manager_password
 
         private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            LoadPasswords(SearchBox.Text);
+            // Получаем текущую выбранную категорию
+            if (CategoriesList.SelectedItem is ListBoxItem selectedItem)
+            {
+                string categoryTag = selectedItem.Tag?.ToString() ?? "all";
+                FilterByCategory(categoryTag);
+            }
+            else
+            {
+                // Если ничего не выбрано, показываем все
+                FilterByCategory("all");
+            }
         }
 
         private void Logout_Click(object sender, RoutedEventArgs e)
@@ -520,8 +809,10 @@ namespace Manager_password
             public bool IsFavorite { get; set; }
             public int AccessCount { get; set; }
             public DateTime? LastAccessedAt { get; set; }
+            public int? CategoryId { get; set; }
+            public string CategoryName { get; set; }
+            public string CategoryColor { get; set; }
 
-            // Свойства для отображения в UI
             public string DisplayTitle => string.IsNullOrEmpty(Website) ? Title : $"{Title} ({Website})";
             public string LastAccessedDisplay => LastAccessedAt?.ToString("dd.MM.yyyy HH:mm") ?? "Никогда";
         }

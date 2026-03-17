@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Manager_password"
         mc:Ignorable="d"
         Title="Менеджер паролей" 
-        Height="700" Width="1030"
+        Height="700" Width="1155"
         WindowStartupLocation="CenterScreen"
         Background="#F0F3F4">
     <Grid>
@@ -14,7 +14,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <!-- Добавлено для статусной строки -->
         </Grid.RowDefinitions>
 
         <!-- Верхняя панель -->
@@ -71,12 +70,9 @@
                     <ListBox x:Name="CategoriesList" 
                              Background="Transparent"
                              BorderThickness="0"
-                             SelectionMode="Single">
-                        <ListBoxItem Content="🔐 Все пароли" IsSelected="True"/>
-                        <ListBoxItem Content="🌐 Сайты"/>
-                        <ListBoxItem Content="📧 Email"/>
-                        <ListBoxItem Content="💳 Банковские карты"/>
-                        <ListBoxItem Content="📱 Приложения"/>
+                             SelectionMode="Single"
+                             SelectionChanged="CategoriesList_SelectionChanged">
+                        <!-- Пункты будут добавляться программно -->
                     </ListBox>
                 </StackPanel>
             </Border>
@@ -139,7 +135,15 @@
                                 </GridViewColumn>
                                 <GridViewColumn Header="Сайт" Width="150" 
                                                 DisplayMemberBinding="{Binding Website}"/>
-                                <GridViewColumn Header="Действия" Width="120">
+                                <GridViewColumn Header="Категория" Width="120">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding CategoryName}" 
+                                                       Foreground="{Binding CategoryColor}"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Действия" Width="150">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">
@@ -183,7 +187,7 @@
             </Border>
         </Grid>
 
-        <!-- Нижняя статусная панель (ДОБАВЛЕНО) -->
+        <!-- Нижняя статусная панель -->
         <Border Grid.Row="2" Background="#2C3E50" Padding="10,5">
             <Grid>
                 <Grid.ColumnDefinitions>

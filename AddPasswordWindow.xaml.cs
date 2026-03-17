@@ -24,6 +24,13 @@ namespace Password_manager
         private byte[] _masterKey;
         private PasswordEntry _editingEntry;
 
+        // Вспомогательный класс для ComboBox
+        public class CategoryItem
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+        }
+
         public AddPasswordWindow(int userId, byte[] masterKey, PasswordEntry entry = null)
         {
             InitializeComponent();
@@ -31,9 +38,10 @@ namespace Password_manager
             _masterKey = masterKey;
             _editingEntry = entry;
 
+            LoadCategories();
+
             if (entry != null)
             {
-                // Режим редактирования
                 WindowTitle.Text = "✏️ Редактировать пароль";
                 btnSave.Content = "Обновить";
 
@@ -41,15 +49,56 @@ namespace Password_manager
                 txtUsername.Text = entry.Username;
                 txtWebsite.Text = entry.Website;
                 txtNotes.Text = entry.Notes;
-
-                // ВАЖНО: entry.EncryptedPassword содержит ВРЕМЕННО расшифрованный пароль
                 txtPassword.Password = entry.EncryptedPassword;
             }
         }
 
-        /// <summary>
-        /// Генерация случайного пароля
-        /// </summary>
+        private void LoadCategories()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    var categories = db.Categories
+                        .Where(c => c.UserId == _userId)
+                        .OrderBy(c => c.DisplayOrder)
+                        .ToList();
+
+                    var categoryList = new System.Collections.Generic.List<CategoryItem>();
+
+                    // Добавляем пункт "Без категории"
+                    categoryList.Add(new CategoryItem
+                    {
+                        Id = 0,
+                        Name = "🚫 Без категории"
+                    });
+
+                    // Добавляем категории пользователя
+                    foreach (var cat in categories)
+                    {
+                        categoryList.Add(new CategoryItem
+                        {
+                            Id = cat.Id,
+                            Name = $"{cat.Icon} {cat.Name}"
+                        });
+                    }
+
+                    cmbCategory.ItemsSource = categoryList;
+                    cmbCategory.SelectedValue = 0; // "Без категории" по умолчанию
+
+                    // Если редактируем существующий пароль, выбираем его категорию
+                    if (_editingEntry != null && _editingEntry.CategoryId.HasValue)
+                    {
+                        cmbCategory.SelectedValue = _editingEntry.CategoryId.Value;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки категорий: {ex.Message}");
+            }
+        }
+
         private string GenerateStrongPassword(int length = 16)
         {
             const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -62,25 +111,19 @@ namespace Password_manager
 
             char[] password = new char[length];
 
-            // Гарантируем хотя бы по одному символу каждого типа
             password[0] = uppercase[random.Next(uppercase.Length)];
             password[1] = lowercase[random.Next(lowercase.Length)];
             password[2] = digits[random.Next(digits.Length)];
             password[3] = special[random.Next(special.Length)];
 
-            // Заполняем остальные символы случайно
             for (int i = 4; i < length; i++)
             {
                 password[i] = allChars[random.Next(allChars.Length)];
             }
 
-            // Перемешиваем массив
             return new string(password.OrderBy(x => random.Next()).ToArray());
         }
 
-        /// <summary>
-        /// Обработчик кнопки генерации пароля
-        /// </summary>
         private void GeneratePassword_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -88,10 +131,8 @@ namespace Password_manager
                 string password = GenerateStrongPassword(16);
                 txtPassword.Password = password;
 
-                // Копируем в буфер обмена
                 Clipboard.SetText(password);
 
-                // Визуальная обратная связь
                 var button = sender as Button;
                 if (button != null)
                 {
@@ -112,7 +153,6 @@ namespace Password_manager
                     timer.Start();
                 }
 
-                // Показываем уведомление
                 MessageBox.Show($"Пароль сгенерирован и скопирован в буфер обмена!\n\nПароль: {password}",
                     "Генератор", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -123,36 +163,24 @@ namespace Password_manager
             }
         }
 
-        /// <summary>
-        /// Отмена - закрытие окна
-        /// </summary>
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
             Close();
         }
 
-        /// <summary>
-        /// Закрытие окна (кнопка ✕)
-        /// </summary>
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
             Close();
         }
 
-        /// <summary>
-        /// Перетаскивание окна
-        /// </summary>
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.LeftButton == MouseButtonState.Pressed)
                 this.DragMove();
         }
 
-        /// <summary>
-        /// Обработка клавиш
-        /// </summary>
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Escape)
@@ -161,7 +189,6 @@ namespace Password_manager
             }
             else if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
-                // Ctrl+Enter - сохранить
                 BtnSave_Click(sender, e);
             }
         }
@@ -196,7 +223,7 @@ namespace Password_manager
         {
             if (e.Key == Key.Enter)
             {
-                txtNotes.Focus();
+                cmbCategory.Focus();
             }
         }
 
@@ -206,18 +233,10 @@ namespace Password_manager
             {
                 BtnSave_Click(sender, e);
             }
-            else if (e.Key == Key.Enter)
-            {
-                // Обычный Enter в заметках переводит на новую строку
-                // Ничего не делаем
-            }
         }
 
         #endregion
 
-        /// <summary>
-        /// Сохранение пароля
-        /// </summary>
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -227,6 +246,17 @@ namespace Password_manager
                 string password = txtPassword.Password;
                 string website = txtWebsite.Text.Trim();
                 string notes = txtNotes.Text.Trim();
+
+                // Получаем выбранную категорию
+                int? categoryId = null;
+                if (cmbCategory.SelectedValue != null)
+                {
+                    int selectedId = (int)cmbCategory.SelectedValue;
+                    if (selectedId > 0)
+                    {
+                        categoryId = selectedId;
+                    }
+                }
 
                 // Валидация
                 if (string.IsNullOrEmpty(title))
@@ -276,6 +306,7 @@ namespace Password_manager
                         var newEntry = new PasswordEntry
                         {
                             UserId = _userId,
+                            CategoryId = categoryId,
                             Title = title,
                             Username = username,
                             EncryptedPassword = encryptedPassword,
@@ -283,7 +314,8 @@ namespace Password_manager
                             Notes = notes,
                             CreatedAt = DateTime.Now,
                             UpdatedAt = DateTime.Now,
-                            AccessCount = 0
+                            AccessCount = 0,
+                            IsFavorite = false
                         };
 
                         db.PasswordEntries.Add(newEntry);
@@ -303,6 +335,7 @@ namespace Password_manager
                             entry.EncryptedPassword = PasswordEncryptor.Encrypt(password, _masterKey);
                             entry.Website = website;
                             entry.Notes = notes;
+                            entry.CategoryId = categoryId;
                             entry.UpdatedAt = DateTime.Now;
 
                             db.SaveChanges();

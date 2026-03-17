@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Password_manager;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -40,6 +41,8 @@ namespace Manager_password
     {
         public int Id { get; set; }
         public int UserId { get; set; }
+        public int? CategoryId { get; set; } // Добавлено - связь с категорией
+
         public string Title { get; set; }
         public string Username { get; set; }
         public string EncryptedPassword { get; set; }
@@ -49,10 +52,12 @@ namespace Manager_password
         public DateTime UpdatedAt { get; set; }
         public int AccessCount { get; set; }
         public DateTime? LastAccessedAt { get; set; }
-        public bool IsFavorite { get; set; } // Избранное
+        public bool IsFavorite { get; set; }
 
+        // Навигационные свойства
         public User User { get; set; }
+        public Category Category { get; set; } // Добавлено
     }
-   
+
 }
 
