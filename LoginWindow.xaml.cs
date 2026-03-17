@@ -24,7 +24,6 @@ namespace Password_manager
         {
             InitializeComponent();
 
-            // Создание базы данных при первом запуске
             try
             {
                 using (var db = new AppDbContext())
@@ -55,51 +54,57 @@ namespace Password_manager
 
                 using (var db = new AppDbContext())
                 {
-                    var user = db.Users.FirstOrDefault(u => u.Name == username);
+                    // Получаем всех пользователей
+                    var users = db.Users.ToList();
+                    User foundUser = null;
+                    byte[] masterKey = null;
 
-                    if (user == null)
+                    // Ищем пользователя, расшифровывая логин каждого
+                    foreach (var user in users)
+                    {
+                        try
+                        {
+                            // Пытаемся расшифровать мастер-ключ паролем
+                            masterKey = PasswordEncryptor.DecryptMasterKey(user.EncryptedMasterKey, password);
+
+                            // Если успешно, расшифровываем логин
+                            string decryptedUsername = DeterministicEncryption.Decrypt(user.EncryptedUsername, masterKey);
+
+                            if (decryptedUsername == username)
+                            {
+                                foundUser = user;
+                                break;
+                            }
+                        }
+                        catch
+                        {
+                            // Неправильный пароль для этого пользователя - пропускаем
+                            continue;
+                        }
+                    }
+
+                    if (foundUser == null)
                     {
                         MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
                             MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
 
-                    // Проверяем пароль
-                    if (!PasswordHasher.VerifyPassword(password, user.PasswordHash))
+                    // Проверяем пароль через хеш
+                    if (!PasswordHasher.VerifyPassword(password, foundUser.PasswordHash))
                     {
                         MessageBox.Show("Неверное имя пользователя или пароль", "Ошибка",
                             MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
 
-                    // Проверяем наличие мастер-ключа
-                    if (string.IsNullOrEmpty(user.EncryptedMasterKey))
-                    {
-                        MessageBox.Show("Мастер-ключ не найден. Возможно, профиль поврежден.",
-                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                        return;
-                    }
+                    // Вход выполнен успешно
+                    foundUser.LastLoginAt = DateTime.Now;
+                    db.SaveChanges();
 
-                    // Пытаемся расшифровать мастер-ключ (это подтвердит правильность пароля)
-                    try
-                    {
-                        byte[] masterKey = PasswordEncryptor.DecryptMasterKey(user.EncryptedMasterKey, password);
-
-                        // Если расшифровка успешна, продолжаем
-                        user.LastLoginAt = DateTime.Now;
-                        db.SaveChanges();
-
-                        // Передаем ID пользователя и пароль (для расшифровки мастер-ключа в MainWindow)
-                        MainWindow mainWindow = new MainWindow(user.Id, password);
-                        mainWindow.Show();
-                        this.Close();
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Ошибка при расшифровке мастер-ключа: {ex.Message}\n\n" +
-                            "Возможно, пароль не совпадает или данные повреждены.",
-                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    MainWindow mainWindow = new MainWindow(foundUser.Id, password);
+                    mainWindow.Show();
+                    this.Close();
                 }
             }
             catch (Exception ex)
@@ -116,24 +121,15 @@ namespace Password_manager
             this.Close();
         }
 
-        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-                this.DragMove();
-        }
-
-      
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
         }
 
-        private void TxtUsername_KeyDown(object sender, KeyEventArgs e)
+        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.Key == Key.Enter)
-            {
-                txtPassword.Focus();
-            }
+            if (e.LeftButton == MouseButtonState.Pressed)
+                this.DragMove();
         }
 
         private void TxtPassword_KeyDown(object sender, KeyEventArgs e)
@@ -141,6 +137,14 @@ namespace Password_manager
             if (e.Key == Key.Enter)
             {
                 BtnLogin_Click(sender, e);
+            }
+        }
+
+        private void TxtUsername_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                txtPassword.Focus();
             }
         }
 

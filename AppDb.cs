@@ -17,39 +17,36 @@ namespace Manager_password
         {
             string dbPath = System.IO.Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory,
-                "Base_Password_Manager.db");
+                "password_manager.db");
 
             optionsBuilder.UseSqlite($"Data Source={dbPath}");
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Уникальный индекс для имени пользователя
-            modelBuilder.Entity<User>()
-                .HasIndex(u => u.Name)
-                .IsUnique();
-
-            // Уникальный индекс для email
-            modelBuilder.Entity<User>()
-                .HasIndex(u => u.Email)
-                .IsUnique();
-
-            // Настройка связи между User и PasswordEntry
+            // Настройка связей
             modelBuilder.Entity<PasswordEntry>()
                 .HasOne(p => p.User)
                 .WithMany(u => u.PasswordEntries)
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Индекс для быстрого поиска по UserId
-            modelBuilder.Entity<PasswordEntry>()
-                .HasIndex(p => p.UserId);
+            // Индексы для быстрого поиска
+            // ИСПРАВЛЕНО: Вместо Name используем EncryptedUsername
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.EncryptedUsername)
+                .IsUnique();
 
-            // Индекс для поиска по заголовку
-            modelBuilder.Entity<PasswordEntry>()
-                .HasIndex(p => p.Title);
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
 
-            
+            modelBuilder.Entity<PasswordEntry>()
+                .HasIndex(p => p.Website);
+
+            // Добавляем индекс для поиска по зашифрованному логину
+            modelBuilder.Entity<PasswordEntry>()
+                .HasIndex(p => p.Username);
         }
     }
 }

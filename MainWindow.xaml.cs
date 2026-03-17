@@ -42,6 +42,9 @@ namespace Manager_password
             {
                 LoadMasterKey();
                 LoadPasswords();
+
+                // Устанавливаем имя пользователя в статусную строку
+                UserInfoText.Text = $"Пользователь: {GetCurrentUsername()}";
             }
             else
             {
@@ -154,7 +157,11 @@ namespace Manager_password
                         var user = userDb.Users.Find(_currentUserId);
                         if (user != null)
                         {
-                            UserInfoText.Text = $"Пользователь: {user.Name}";
+                            if (user != null && !string.IsNullOrEmpty(user.EncryptedUsername))
+                            {
+                                string username = DeterministicEncryption.Decrypt(user.EncryptedUsername, _masterKey);
+                                UserInfoText.Text = $"Пользователь: {username}";
+                            }
                         }
                     }
                 }
@@ -224,6 +231,27 @@ namespace Manager_password
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        private string GetCurrentUsername()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    var user = db.Users.Find(_currentUserId);
+                    if (user != null && !string.IsNullOrEmpty(user.EncryptedUsername))
+                    {
+                        // Расшифровываем логин для отображения
+                        return DeterministicEncryption.Decrypt(user.EncryptedUsername, _masterKey);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при получении имени пользователя: {ex.Message}");
+            }
+            return "Пользователь";
+        }
+
 
         private void EditPassword_Click(object sender, RoutedEventArgs e)
         {

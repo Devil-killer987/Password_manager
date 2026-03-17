@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,17 +10,29 @@ namespace Manager_password
     public class User
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+
+        // Зашифрованный логин (детерминированное шифрование)
+        public string EncryptedUsername { get; set; }
+
+        // Хеш пароля (включает соль внутри себя)
         public string PasswordHash { get; set; }
+
+        // Email пользователя
         public string Email { get; set; }
+
+        // Дата создания
         public DateTime CreatedAt { get; set; }
+
+        // Дата последнего входа
         public DateTime? LastLoginAt { get; set; }
+
+        // Активен ли пользователь
         public bool IsActive { get; set; } = true;
 
         // Зашифрованный мастер-ключ для шифрования паролей
         public string? EncryptedMasterKey { get; set; }
 
-        // Навигационное свойство
+        // Навигационное свойство - все пароли пользователя
         public ICollection<PasswordEntry> PasswordEntries { get; set; }
     }
 
@@ -40,5 +53,6 @@ namespace Manager_password
 
         public User User { get; set; }
     }
+   
 }
 

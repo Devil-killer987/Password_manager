@@ -19,377 +19,317 @@ namespace Password_manager
     /// <summary>
     /// Логика взаимодействия для RegisterWindow.xaml
     /// </summary>
-   
-        public partial class RegisterWindow : Window
-        {
-            public RegisterWindow()
-            {
-                InitializeComponent();
 
-                // Отключаем кнопку регистрации до совпадения паролей
+    public partial class RegisterWindow : Window
+    {
+        public RegisterWindow()
+        {
+            InitializeComponent();
+            btnRegister.IsEnabled = false;
+        }
+
+        private string GenerateRandomPassword(int length = 16)
+        {
+            const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const string lowercase = "abcdefghijklmnopqrstuvwxyz";
+            const string digits = "0123456789";
+            const string special = "!@#$%^&*()_-+=<>?";
+
+            string allChars = uppercase + lowercase + digits + special;
+            Random random = new Random();
+
+            char[] password = new char[length];
+            password[0] = uppercase[random.Next(uppercase.Length)];
+            password[1] = lowercase[random.Next(lowercase.Length)];
+            password[2] = digits[random.Next(digits.Length)];
+            password[3] = special[random.Next(special.Length)];
+
+            for (int i = 4; i < length; i++)
+            {
+                password[i] = allChars[random.Next(allChars.Length)];
+            }
+
+            return new string(password.OrderBy(x => random.Next()).ToArray());
+        }
+
+        private void GeneratePassword_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string newPassword = GenerateRandomPassword(16);
+                txtPassword.Password = newPassword;
+                txtConfirmPassword.Password = newPassword;
+
+                Clipboard.SetText(newPassword);
+
+                TxtPassword_PasswordChanged(sender, e);
+                CheckPasswordsMatch();
+
+                MessageBox.Show($"Сгенерирован пароль и скопирован в буфер обмена!",
+                    "Генератор", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при генерации пароля: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private int CheckPasswordStrength(string password)
+        {
+            if (string.IsNullOrEmpty(password))
+                return 0;
+
+            int score = 0;
+
+            if (password.Length >= 12) score += 30;
+            else if (password.Length >= 8) score += 20;
+            else if (password.Length >= 6) score += 10;
+
+            if (password.Any(char.IsLower)) score += 20;
+            if (password.Any(char.IsUpper)) score += 20;
+            if (password.Any(char.IsDigit)) score += 15;
+            if (password.Any(ch => !char.IsLetterOrDigit(ch))) score += 15;
+
+            return Math.Min(100, score);
+        }
+
+        private void CheckPasswordsMatch()
+        {
+            string password = txtPassword.Password;
+            string confirmPassword = txtConfirmPassword.Password;
+
+            if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirmPassword))
+            {
+                PasswordMatchText.Text = "";
+                btnRegister.IsEnabled = false;
+                return;
+            }
+
+            if (password == confirmPassword)
+            {
+                PasswordMatchText.Text = "✓ Пароли совпадают";
+                PasswordMatchText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
+                btnRegister.IsEnabled = true;
+            }
+            else
+            {
+                PasswordMatchText.Text = "✗ Пароли не совпадают";
+                PasswordMatchText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
                 btnRegister.IsEnabled = false;
             }
+        }
 
-            /// <summary>
-            /// Генерация случайного пароля
-            /// </summary>
-            private string GenerateRandomPassword(int length = 16)
+        private void TxtPassword_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            string password = txtPassword.Password;
+
+            if (string.IsNullOrEmpty(password))
             {
-                const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                const string lowercase = "abcdefghijklmnopqrstuvwxyz";
-                const string digits = "0123456789";
-                const string special = "!@#$%^&*()_-+=<>?";
-
-                string allChars = uppercase + lowercase + digits + special;
-                Random random = new Random();
-
-                char[] password = new char[length];
-
-                // Гарантируем хотя бы по одному символу каждого типа
-                password[0] = uppercase[random.Next(uppercase.Length)];
-                password[1] = lowercase[random.Next(lowercase.Length)];
-                password[2] = digits[random.Next(digits.Length)];
-                password[3] = special[random.Next(special.Length)];
-
-                // Заполняем остальные символы
-                for (int i = 4; i < length; i++)
-                {
-                    password[i] = allChars[random.Next(allChars.Length)];
-                }
-
-                // Перемешиваем
-                return new string(password.OrderBy(x => random.Next()).ToArray());
+                PasswordStrengthBar.Value = 0;
+                PasswordStrengthText.Text = "";
+                return;
             }
 
-            /// <summary>
-            /// Обработчик кнопки генерации пароля
-            /// </summary>
-            private void GeneratePassword_Click(object sender, RoutedEventArgs e)
+            int strength = CheckPasswordStrength(password);
+            PasswordStrengthBar.Value = strength;
+
+            if (strength < 30)
             {
-                try
-                {
-                    string newPassword = GenerateRandomPassword(16);
-                    txtPassword.Password = newPassword;
-                    txtConfirmPassword.Password = newPassword;
-
-                    // Копируем в буфер обмена
-                    Clipboard.SetText(newPassword);
-
-                    // Обновляем индикатор сложности
-                    TxtPassword_PasswordChanged(sender, e);
-                    CheckPasswordsMatch();
-
-                    MessageBox.Show($"Сгенерирован пароль:\n\n{newPassword}\n\nПароль скопирован в буфер обмена.",
-                        "Генератор", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при генерации пароля: {ex.Message}",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                PasswordStrengthText.Text = "Слабый";
+                PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
             }
-
-            /// <summary>
-            /// Проверка сложности пароля
-            /// </summary>
-            private int CheckPasswordStrength(string password)
+            else if (strength < 60)
             {
-                if (string.IsNullOrEmpty(password))
-                    return 0;
-
-                int score = 0;
-
-                // Длина
-                if (password.Length >= 12) score += 30;
-                else if (password.Length >= 8) score += 20;
-                else if (password.Length >= 6) score += 10;
-
-                // Разнообразие символов
-                if (password.Any(char.IsLower)) score += 20;
-                if (password.Any(char.IsUpper)) score += 20;
-                if (password.Any(char.IsDigit)) score += 15;
-                if (password.Any(ch => !char.IsLetterOrDigit(ch))) score += 15;
-
-                return Math.Min(100, score);
+                PasswordStrengthText.Text = "Средний";
+                PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
             }
-
-            /// <summary>
-            /// Проверка совпадения паролей
-            /// </summary>
-            private void CheckPasswordsMatch()
+            else if (strength < 80)
             {
+                PasswordStrengthText.Text = "Хороший";
+                PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB"));
+            }
+            else
+            {
+                PasswordStrengthText.Text = "Отличный";
+                PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
+            }
+        }
+
+        private void TxtConfirmPassword_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            CheckPasswordsMatch();
+        }
+
+        // Навигация по Enter
+        private void TxtUsername_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) txtEmail.Focus();
+        }
+
+        private void TxtEmail_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) txtPassword.Focus();
+        }
+
+        private void TxtPassword_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) txtConfirmPassword.Focus();
+        }
+
+        private void TxtConfirmPassword_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && btnRegister.IsEnabled)
+                BtnRegister_Click(sender, e);
+        }
+
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape) BtnClose_Click(sender, e);
+        }
+
+        private void BtnRegister_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string username = txtUsername.Text.Trim();
+                string email = txtEmail.Text.Trim();
                 string password = txtPassword.Password;
                 string confirmPassword = txtConfirmPassword.Password;
 
-                if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirmPassword))
+                // Валидация
+                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) ||
+                    string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirmPassword))
                 {
-                    PasswordMatchText.Text = "";
-                    btnRegister.IsEnabled = false;
+                    MessageBox.Show("Пожалуйста, заполните все поля", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                if (password == confirmPassword)
+                if (password != confirmPassword)
                 {
-                    PasswordMatchText.Text = "✓ Пароли совпадают";
-                    PasswordMatchText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
-                    btnRegister.IsEnabled = true;
-                }
-                else
-                {
-                    PasswordMatchText.Text = "✗ Пароли не совпадают";
-                    PasswordMatchText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
-                    btnRegister.IsEnabled = false;
-                }
-            }
-
-            /// <summary>
-            /// Обновление индикатора сложности пароля
-            /// </summary>
-            private void TxtPassword_PasswordChanged(object sender, RoutedEventArgs e)
-            {
-                string password = txtPassword.Password;
-
-                if (string.IsNullOrEmpty(password))
-                {
-                    PasswordStrengthBar.Value = 0;
-                    PasswordStrengthText.Text = "";
+                    MessageBox.Show("Пароли не совпадают", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 int strength = CheckPasswordStrength(password);
-                PasswordStrengthBar.Value = strength;
+                if (strength < 50)
+                {
+                    var result = MessageBox.Show(
+                        "Пароль слишком слабый. Всё равно продолжить?",
+                        "Предупреждение",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
 
-                if (strength < 30)
-                {
-                    PasswordStrengthText.Text = "Слабый";
-                    PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
+                    if (result == MessageBoxResult.No)
+                        return;
                 }
-                else if (strength < 60)
-                {
-                    PasswordStrengthText.Text = "Средний";
-                    PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
-                }
-                else if (strength < 80)
-                {
-                    PasswordStrengthText.Text = "Хороший";
-                    PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB"));
-                }
-                else
-                {
-                    PasswordStrengthText.Text = "Отличный";
-                    PasswordStrengthText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
-                }
-            }
 
-            /// <summary>
-            /// Обработчик изменения поля подтверждения пароля
-            /// </summary>
-            private void TxtConfirmPassword_PasswordChanged(object sender, RoutedEventArgs e)
-            {
-                CheckPasswordsMatch();
-            }
-
-            /// <summary>
-            /// Навигация по клавише Enter
-            /// </summary>
-            private void TxtUsername_KeyDown(object sender, KeyEventArgs e)
-            {
-                if (e.Key == Key.Enter)
+                if (!IsValidEmail(email))
                 {
-                    txtEmail.Focus();
+                    MessageBox.Show("Введите корректный email адрес", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
-            }
 
-            private void TxtEmail_KeyDown(object sender, KeyEventArgs e)
-            {
-                if (e.Key == Key.Enter)
+                using (var db = new AppDbContext())
                 {
-                    txtPassword.Focus();
-                }
-            }
-
-            private void TxtPassword_KeyDown(object sender, KeyEventArgs e)
-            {
-                if (e.Key == Key.Enter)
-                {
-                    txtConfirmPassword.Focus();
-                }
-            }
-
-            private void TxtConfirmPassword_KeyDown(object sender, KeyEventArgs e)
-            {
-                if (e.Key == Key.Enter && btnRegister.IsEnabled)
-                {
-                    BtnRegister_Click(sender, e);
-                }
-            }
-
-            /// <summary>
-            /// Обработчик клавиш окна
-            /// </summary>
-            private void Window_KeyDown(object sender, KeyEventArgs e)
-            {
-                if (e.Key == Key.Escape)
-                {
-                    BtnClose_Click(sender, e);
-                }
-            }
-
-            /// <summary>
-            /// Регистрация нового пользователя
-            /// </summary>
-            private void BtnRegister_Click(object sender, RoutedEventArgs e)
-            {
-                try
-                {
-                    string username = txtUsername.Text.Trim();
-                    string email = txtEmail.Text.Trim();
-                    string password = txtPassword.Password;
-                    string confirmPassword = txtConfirmPassword.Password;
-
-                    // Валидация
-                    if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) ||
-                        string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirmPassword))
+                    // Генерируем мастер-ключ для пользователя
+                    byte[] masterKey = new byte[32];
+                    using (var rng = RandomNumberGenerator.Create())
                     {
-                        MessageBox.Show("Пожалуйста, заполните все поля", "Ошибка",
+                        rng.GetBytes(masterKey);
+                    }
+
+                    // Шифруем логин детерминированным методом
+                    string encryptedUsername = DeterministicEncryption.Encrypt(username, masterKey);
+
+                    // Проверяем существование пользователя по зашифрованному логину
+                    if (db.Users.Any(u => u.EncryptedUsername == encryptedUsername))
+                    {
+                        MessageBox.Show("Пользователь с таким именем уже существует", "Ошибка",
                             MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
 
-                    if (password != confirmPassword)
+                    if (db.Users.Any(u => u.Email == email))
                     {
-                        MessageBox.Show("Пароли не совпадают", "Ошибка",
+                        MessageBox.Show("Пользователь с таким email уже существует", "Ошибка",
                             MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
 
-                    // Проверка сложности пароля
-                    int strength = CheckPasswordStrength(password);
-                    if (strength < 50)
+                    // Хеширование пароля (соль включается в хеш)
+                    string passwordHash = PasswordHasher.HashPassword(password);
+
+                    // Шифрование мастер-ключа
+                    string encryptedMasterKey = PasswordEncryptor.EncryptMasterKey(masterKey, password);
+
+                    // Создание пользователя
+                    var newUser = new User
                     {
-                        var result = MessageBox.Show(
-                            "Пароль слишком слабый. Рекомендуется использовать более надежный пароль.\n\nВсё равно продолжить?",
-                            "Предупреждение",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Warning);
+                        EncryptedUsername = encryptedUsername,
+                        Email = email,
+                        PasswordHash = passwordHash,
+                        CreatedAt = DateTime.Now,
+                        LastLoginAt = null,
+                        IsActive = true,
+                        EncryptedMasterKey = encryptedMasterKey,
+                        PasswordEntries = new System.Collections.Generic.List<PasswordEntry>()
+                    };
 
-                        if (result == MessageBoxResult.No)
-                            return;
-                    }
+                    db.Users.Add(newUser);
+                    db.SaveChanges();
 
-                    if (!IsValidEmail(email))
-                    {
-                        MessageBox.Show("Введите корректный email адрес", "Ошибка",
-                            MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
+                    MessageBox.Show("Регистрация прошла успешно!", "Успех",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
 
-                    using (var db = new AppDbContext())
-                    {
-                        // Проверка существования пользователя
-                        if (db.Users.Any(u => u.Name == username))
-                        {
-                            MessageBox.Show("Пользователь с таким именем уже существует", "Ошибка",
-                                MessageBoxButton.OK, MessageBoxImage.Warning);
-                            return;
-                        }
-
-                        if (db.Users.Any(u => u.Email == email))
-                        {
-                            MessageBox.Show("Пользователь с таким email уже существует", "Ошибка",
-                                MessageBoxButton.OK, MessageBoxImage.Warning);
-                            return;
-                        }
-
-                        // Хеширование пароля
-                        string passwordHash = PasswordHasher.HashPassword(password);
-
-                        // Генерация мастер-ключа
-                        byte[] masterKey = new byte[32];
-                        using (var rng = RandomNumberGenerator.Create())
-                        {
-                            rng.GetBytes(masterKey);
-                        }
-
-                        // Шифрование мастер-ключа
-                        string encryptedMasterKey = PasswordEncryptor.EncryptMasterKey(masterKey, password);
-
-                        // Создание пользователя
-                        var newUser = new User
-                        {
-                            Name = username,
-                            Email = email,
-                            PasswordHash = passwordHash,
-                            CreatedAt = DateTime.Now,
-                            LastLoginAt = null,
-                            IsActive = true,
-                            EncryptedMasterKey = encryptedMasterKey,
-                            PasswordEntries = new System.Collections.Generic.List<PasswordEntry>()
-                        };
-
-                        db.Users.Add(newUser);
-                        db.SaveChanges();
-
-                        MessageBox.Show("Регистрация прошла успешно!", "Успех",
-                            MessageBoxButton.OK, MessageBoxImage.Information);
-
-                        // Открываем главное окно
-                        MainWindow mainWindow = new MainWindow(newUser.Id, password);
-                        mainWindow.Show();
-                        this.Close();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при регистрации: {ex.Message}",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    // Открываем главное окно
+                    MainWindow mainWindow = new MainWindow(newUser.Id, password);
+                    mainWindow.Show();
+                    this.Close();
                 }
             }
-
-            /// <summary>
-            /// Проверка корректности email
-            /// </summary>
-            private bool IsValidEmail(string email)
+            catch (Exception ex)
             {
-                try
-                {
-                    var addr = new System.Net.Mail.MailAddress(email);
-                    return addr.Address == email;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-
-            /// <summary>
-            /// Переход к окну входа
-            /// </summary>
-            private void LoginLink_Click(object sender, RoutedEventArgs e)
-            {
-                LoginWindow loginWindow = new LoginWindow();
-                loginWindow.Show();
-                this.Close();
-            }
-
-            /// <summary>
-            /// Закрытие окна
-            /// </summary>
-            private void BtnClose_Click(object sender, RoutedEventArgs e)
-            {
-                LoginWindow loginWindow = new LoginWindow();
-                loginWindow.Show();
-                this.Close();
-            }
-
-            /// <summary>
-            /// Перетаскивание окна
-            /// </summary>
-            private void Window_MouseDown(object sender, MouseButtonEventArgs e)
-            {
-                if (e.LeftButton == MouseButtonState.Pressed)
-                    this.DragMove();
+                MessageBox.Show($"Ошибка при регистрации: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private bool IsValidEmail(string email)
+        {
+            try
+            {
+                var addr = new System.Net.Mail.MailAddress(email);
+                return addr.Address == email;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void LoginLink_Click(object sender, RoutedEventArgs e)
+        {
+            LoginWindow loginWindow = new LoginWindow();
+            loginWindow.Show();
+            this.Close();
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            LoginWindow loginWindow = new LoginWindow();
+            loginWindow.Show();
+            this.Close();
+        }
+
+        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                this.DragMove();
+        }
     }
+}
 

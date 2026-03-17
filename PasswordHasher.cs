@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace Password_manager
 {
+
     public static class PasswordHasher
     {
         private const int SaltSize = 16;
@@ -14,7 +15,7 @@ namespace Password_manager
         private const int Iterations = 10000;
 
         /// <summary>
-        /// Хеширование пароля с солью
+        /// Хеширование пароля (соль включается в хеш)
         /// </summary>
         public static string HashPassword(string password)
         {
@@ -30,7 +31,7 @@ namespace Password_manager
             {
                 byte[] hash = pbkdf2.GetBytes(HashSize);
 
-                // Объединяем соль и хеш
+                // Объединяем соль и хеш в один массив
                 byte[] hashBytes = new byte[SaltSize + HashSize];
                 Array.Copy(salt, 0, hashBytes, 0, SaltSize);
                 Array.Copy(hash, 0, hashBytes, SaltSize, HashSize);
@@ -44,41 +45,45 @@ namespace Password_manager
         /// </summary>
         public static bool VerifyPassword(string password, string storedHash)
         {
-            // Получаем байты из сохраненного хеша
-            byte[] hashBytes = Convert.FromBase64String(storedHash);
-
-            // Извлекаем соль
-            byte[] salt = new byte[SaltSize];
-            Array.Copy(hashBytes, 0, salt, 0, SaltSize);
-
-            // Извлекаем оригинальный хеш
-            byte[] originalHash = new byte[HashSize];
-            Array.Copy(hashBytes, SaltSize, originalHash, 0, HashSize);
-
-            // Хешируем введенный пароль с той же солью
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256))
+            try
             {
-                byte[] newHash = pbkdf2.GetBytes(HashSize);
+                // Получаем байты из сохраненного хеша
+                byte[] hashBytes = Convert.FromBase64String(storedHash);
 
-                // Сравниваем хеши
-                return CompareHashes(originalHash, newHash);
+                // Извлекаем соль (первые SaltSize байт)
+                byte[] salt = new byte[SaltSize];
+                Array.Copy(hashBytes, 0, salt, 0, SaltSize);
+
+                // Извлекаем оригинальный хеш (оставшиеся байты)
+                byte[] expectedHash = new byte[HashSize];
+                Array.Copy(hashBytes, SaltSize, expectedHash, 0, HashSize);
+
+                // Хешируем введенный пароль с той же солью
+                using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256))
+                {
+                    byte[] actualHash = pbkdf2.GetBytes(HashSize);
+
+                    // Сравниваем хеши
+                    return SlowEquals(expectedHash, actualHash);
+                }
+            }
+            catch
+            {
+                return false;
             }
         }
 
         /// <summary>
-        /// Безопасное сравнение хешей
+        /// Безопасное сравнение хешей (защита от timing attacks)
         /// </summary>
-        private static bool CompareHashes(byte[] hash1, byte[] hash2)
+        private static bool SlowEquals(byte[] a, byte[] b)
         {
-            if (hash1.Length != hash2.Length)
-                return false;
-
-            int result = 0;
-            for (int i = 0; i < hash1.Length; i++)
+            uint diff = (uint)a.Length ^ (uint)b.Length;
+            for (int i = 0; i < a.Length && i < b.Length; i++)
             {
-                result |= hash1[i] ^ hash2[i];
+                diff |= (uint)(a[i] ^ b[i]);
             }
-            return result == 0;
+            return diff == 0;
         }
 
         /// <summary>
@@ -122,123 +127,23 @@ namespace Password_manager
             int score = 0;
 
             // Длина
-            if (password.Length >= 8) score += 25;
-            else if (password.Length >= 6) score += 15;
-            else score += 5;
+            if (password.Length >= 12) score += 30;
+            else if (password.Length >= 8) score += 20;
+            else if (password.Length >= 6) score += 10;
 
             // Строчные буквы
-            if (password.Any(char.IsLower)) score += 15;
+            if (password.Any(char.IsLower)) score += 20;
 
             // Заглавные буквы
             if (password.Any(char.IsUpper)) score += 20;
 
             // Цифры
-            if (password.Any(char.IsDigit)) score += 20;
+            if (password.Any(char.IsDigit)) score += 15;
 
             // Спецсимволы
-            if (password.Any(ch => !char.IsLetterOrDigit(ch))) score += 20;
+            if (password.Any(ch => !char.IsLetterOrDigit(ch))) score += 15;
 
             return Math.Min(100, score);
-        }
-        public static string GenerateStrongPassword(
-          int length = 16,
-          bool includeUppercase = true,
-          bool includeLowercase = true,
-          bool includeDigits = true,
-          bool includeSpecial = true)
-        {
-            const string uppercaseChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const string lowercaseChars = "abcdefghijklmnopqrstuvwxyz";
-            const string digitChars = "0123456789";
-            const string specialChars = "!@#$%^&*()_-+=<>?";
-
-            // Собираем разрешенные символы
-            StringBuilder allowedChars = new StringBuilder();
-            StringBuilder password = new StringBuilder();
-
-            if (includeUppercase)
-            {
-                allowedChars.Append(uppercaseChars);
-                password.Append(uppercaseChars[RandomNumberGenerator.GetInt32(uppercaseChars.Length)]);
-            }
-
-            if (includeLowercase)
-            {
-                allowedChars.Append(lowercaseChars);
-                password.Append(lowercaseChars[RandomNumberGenerator.GetInt32(lowercaseChars.Length)]);
-            }
-
-            if (includeDigits)
-            {
-                allowedChars.Append(digitChars);
-                password.Append(digitChars[RandomNumberGenerator.GetInt32(digitChars.Length)]);
-            }
-
-            if (includeSpecial)
-            {
-                allowedChars.Append(specialChars);
-                password.Append(specialChars[RandomNumberGenerator.GetInt32(specialChars.Length)]);
-            }
-
-            // Если не выбрано ни одного типа символов, используем все
-            if (allowedChars.Length == 0)
-            {
-                allowedChars.Append(uppercaseChars + lowercaseChars + digitChars);
-            }
-
-            // Заполняем оставшуюся длину случайными символами
-            for (int i = password.Length; i < length; i++)
-            {
-                password.Append(allowedChars[RandomNumberGenerator.GetInt32(allowedChars.Length)]);
-            }
-
-            // Перемешиваем пароль для случайного порядка
-            return ShufflePassword(password.ToString());
-        }
-
-        /// <summary>
-        /// Перемешивание символов в пароле
-        /// </summary>
-        private static string ShufflePassword(string password)
-        {
-            char[] array = password.ToCharArray();
-            for (int i = array.Length - 1; i > 0; i--)
-            {
-                int j = RandomNumberGenerator.GetInt32(i + 1);
-                (array[j], array[i]) = (array[i], array[j]);
-            }
-            return new string(array);
-        }
-
-        /// <summary>
-        /// Генерация PIN-кода (только цифры)
-        /// </summary>
-        public static string GeneratePin(int length = 6)
-        {
-            const string digits = "0123456789";
-            StringBuilder pin = new StringBuilder();
-
-            for (int i = 0; i < length; i++)
-            {
-                pin.Append(digits[RandomNumberGenerator.GetInt32(digits.Length)]);
-            }
-
-            return pin.ToString();
-        }
-
-        /// <summary>
-        /// Генерация пароля с проверкой сложности (гарантирует надежность)
-        /// </summary>
-        public static string GenerateSecurePassword(int length = 16)
-        {
-            string password;
-            do
-            {
-                password = GenerateStrongPassword(length);
-            }
-            while (!ValidatePasswordStrength(password).IsValid);
-
-            return password;
         }
     }
 }
