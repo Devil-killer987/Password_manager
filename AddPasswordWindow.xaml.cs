@@ -23,6 +23,17 @@ namespace Password_manager
         private int _userId;
         private byte[] _masterKey;
         private PasswordEntry _editingEntry;
+        private Random _random = new Random();
+
+        // Поля для хранения последних настроек генератора
+        private int _lastPasswordLength = 16;
+        private bool _lastIncludeUppercase = true;
+        private bool _lastIncludeLowercase = true;
+        private bool _lastIncludeDigits = true;
+        private bool _lastIncludeSpecial = true;
+        private bool _lastExcludeSimilar = false;
+        private bool _lastExcludeAmbiguous = false;
+        private bool _lastNoConsecutive = false;
 
         // Вспомогательный класс для ComboBox
         public class CategoryItem
@@ -50,6 +61,12 @@ namespace Password_manager
                 txtWebsite.Text = entry.Website;
                 txtNotes.Text = entry.Notes;
                 txtPassword.Password = entry.EncryptedPassword;
+
+                // Выбираем категорию
+                if (entry.CategoryId.HasValue)
+                {
+                    cmbCategory.SelectedValue = entry.CategoryId.Value;
+                }
             }
         }
 
@@ -95,63 +112,25 @@ namespace Password_manager
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка загрузки категорий: {ex.Message}");
+                MessageBox.Show($"Ошибка загрузки категорий: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
-        private string GenerateStrongPassword(int length = 16)
-        {
-            const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const string lowercase = "abcdefghijklmnopqrstuvwxyz";
-            const string digits = "0123456789";
-            const string special = "!@#$%^&*()_-+=<>?";
+        #region Генерация паролей
 
-            string allChars = uppercase + lowercase + digits + special;
-            Random random = new Random();
-
-            char[] password = new char[length];
-
-            password[0] = uppercase[random.Next(uppercase.Length)];
-            password[1] = lowercase[random.Next(lowercase.Length)];
-            password[2] = digits[random.Next(digits.Length)];
-            password[3] = special[random.Next(special.Length)];
-
-            for (int i = 4; i < length; i++)
-            {
-                password[i] = allChars[random.Next(allChars.Length)];
-            }
-
-            return new string(password.OrderBy(x => random.Next()).ToArray());
-        }
-
-        private void GeneratePassword_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Быстрая генерация пароля (простая)
+        /// </summary>
+        private void GenerateSimplePassword_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 string password = GenerateStrongPassword(16);
                 txtPassword.Password = password;
-
                 Clipboard.SetText(password);
 
-                var button = sender as Button;
-                if (button != null)
-                {
-                    var originalContent = button.Content;
-                    var originalBackground = button.Background;
-
-                    button.Content = "✓";
-                    button.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
-
-                    var timer = new System.Windows.Threading.DispatcherTimer();
-                    timer.Interval = TimeSpan.FromSeconds(1);
-                    timer.Tick += (s, args) =>
-                    {
-                        button.Content = originalContent;
-                        button.Background = originalBackground;
-                        timer.Stop();
-                    };
-                    timer.Start();
-                }
+                ShowTemporaryButtonFeedback(sender as Button, "✓");
 
                 MessageBox.Show($"Пароль сгенерирован и скопирован в буфер обмена!\n\nПароль: {password}",
                     "Генератор", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -163,35 +142,183 @@ namespace Password_manager
             }
         }
 
-        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Генерация с расширенными настройками
+        /// </summary>
+        private void GenerateWithSettings_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = false;
-            Close();
-        }
-
-        private void BtnClose_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-            Close();
-        }
-
-        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-                this.DragMove();
-        }
-
-        private void Window_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Escape)
+            try
             {
-                BtnCancel_Click(sender, e);
+                var settingsWindow = new PasswordGeneratorSettingsWindow(
+                    _lastPasswordLength,
+                    _lastIncludeUppercase,
+                    _lastIncludeLowercase,
+                    _lastIncludeDigits,
+                    _lastIncludeSpecial,
+                    _lastExcludeSimilar,
+                    _lastExcludeAmbiguous,
+                    _lastNoConsecutive
+                );
+
+                settingsWindow.Owner = this;
+
+                if (settingsWindow.ShowDialog() == true)
+                {
+                    txtPassword.Password = settingsWindow.GeneratedPassword;
+                    Clipboard.SetText(settingsWindow.GeneratedPassword);
+
+                    // Сохраняем настройки для следующего раза
+                    _lastPasswordLength = settingsWindow.PasswordLength;
+                    _lastIncludeUppercase = settingsWindow.IncludeUppercase;
+                    _lastIncludeLowercase = settingsWindow.IncludeLowercase;
+                    _lastIncludeDigits = settingsWindow.IncludeDigits;
+                    _lastIncludeSpecial = settingsWindow.IncludeSpecial;
+                    _lastExcludeSimilar = settingsWindow.ExcludeSimilar;
+                    _lastExcludeAmbiguous = settingsWindow.ExcludeAmbiguous;
+                    _lastNoConsecutive = settingsWindow.NoConsecutive;
+
+                    ShowTemporaryButtonFeedback(sender as Button, "✓");
+
+                    MessageBox.Show($"Пароль сгенерирован с заданными параметрами и скопирован в буфер обмена!\n\nПароль: {settingsWindow.GeneratedPassword}",
+                        "Генератор", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
-            else if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            catch (Exception ex)
             {
-                BtnSave_Click(sender, e);
+                MessageBox.Show($"Ошибка при генерации пароля: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        /// <summary>
+        /// Продвинутая генерация пароля с полными настройками
+        /// </summary>
+        private string GenerateStrongPassword(int length,
+                                               bool includeUppercase = true,
+                                               bool includeLowercase = true,
+                                               bool includeDigits = true,
+                                               bool includeSpecial = true,
+                                               bool excludeSimilar = false,
+                                               bool excludeAmbiguous = false,
+                                               bool noConsecutive = false)
+        {
+            string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            string lowercase = "abcdefghijklmnopqrstuvwxyz";
+            string digits = "0123456789";
+            string special = "!@#$%^&*()_-+=<>?";
+
+            // Исключаем похожие символы
+            if (excludeSimilar)
+            {
+                uppercase = uppercase.Replace("I", "").Replace("L", "").Replace("O", "");
+                lowercase = lowercase.Replace("i", "").Replace("l", "").Replace("o", "");
+                digits = digits.Replace("1", "").Replace("0", "");
+            }
+
+            // Исключаем неоднозначные символы
+            if (excludeAmbiguous)
+            {
+                special = special.Replace("{", "").Replace("}", "")
+                                .Replace("[", "").Replace("]", "")
+                                .Replace("(", "").Replace(")", "")
+                                .Replace("/", "").Replace("\\", "");
+            }
+
+            // Собираем разрешенные символы
+            StringBuilder allowedChars = new StringBuilder();
+
+            if (includeUppercase && !string.IsNullOrEmpty(uppercase))
+                allowedChars.Append(uppercase);
+            if (includeLowercase && !string.IsNullOrEmpty(lowercase))
+                allowedChars.Append(lowercase);
+            if (includeDigits && !string.IsNullOrEmpty(digits))
+                allowedChars.Append(digits);
+            if (includeSpecial && !string.IsNullOrEmpty(special))
+                allowedChars.Append(special);
+
+            // Если ничего не выбрано, используем все
+            if (allowedChars.Length == 0)
+                allowedChars.Append(uppercase + lowercase + digits);
+
+            string allChars = allowedChars.ToString();
+
+            // Генерируем пароль
+            StringBuilder password = new StringBuilder();
+
+            // Добавляем по одному символу каждого типа, если они выбраны
+            if (includeUppercase && !string.IsNullOrEmpty(uppercase))
+                password.Append(uppercase[_random.Next(uppercase.Length)]);
+            if (includeLowercase && !string.IsNullOrEmpty(lowercase))
+                password.Append(lowercase[_random.Next(lowercase.Length)]);
+            if (includeDigits && !string.IsNullOrEmpty(digits))
+                password.Append(digits[_random.Next(digits.Length)]);
+            if (includeSpecial && !string.IsNullOrEmpty(special))
+                password.Append(special[_random.Next(special.Length)]);
+
+            // Заполняем остальную длину
+            while (password.Length < length)
+            {
+                char nextChar;
+                do
+                {
+                    nextChar = allChars[_random.Next(allChars.Length)];
+                } while (noConsecutive && password.Length > 0 && password[password.Length - 1] == nextChar);
+
+                password.Append(nextChar);
+            }
+
+            // Перемешиваем
+            return ShuffleString(password.ToString());
+        }
+
+        /// <summary>
+        /// Простая генерация (для обратной совместимости)
+        /// </summary>
+        private string GenerateStrongPassword(int length = 16)
+        {
+            return GenerateStrongPassword(length, true, true, true, true, false, false, false);
+        }
+
+        /// <summary>
+        /// Перемешивание строки
+        /// </summary>
+        private string ShuffleString(string input)
+        {
+            char[] array = input.ToCharArray();
+            for (int i = array.Length - 1; i > 0; i--)
+            {
+                int j = _random.Next(i + 1);
+                (array[j], array[i]) = (array[i], array[j]);
+            }
+            return new string(array);
+        }
+
+        /// <summary>
+        /// Визуальная обратная связь для кнопок
+        /// </summary>
+        private void ShowTemporaryButtonFeedback(Button button, string symbol)
+        {
+            if (button != null)
+            {
+                var originalContent = button.Content;
+                var originalBackground = button.Background;
+
+                button.Content = symbol;
+                button.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
+
+                var timer = new System.Windows.Threading.DispatcherTimer();
+                timer.Interval = TimeSpan.FromSeconds(1);
+                timer.Tick += (s, args) =>
+                {
+                    button.Content = originalContent;
+                    button.Background = originalBackground;
+                    timer.Stop();
+                };
+                timer.Start();
+            }
+        }
+
+        #endregion
 
         #region Навигация по клавише Enter
 
@@ -227,15 +354,43 @@ namespace Password_manager
             }
         }
 
-        private void TxtNotes_KeyDown(object sender, KeyEventArgs e)
+        #endregion
+
+        #region Обработчики окон
+
+        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            if (e.LeftButton == MouseButtonState.Pressed)
+                this.DragMove();
+        }
+
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                BtnCancel_Click(sender, e);
+            }
+            else if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
                 BtnSave_Click(sender, e);
             }
         }
 
+        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
         #endregion
+
+        #region Сохранение
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
@@ -283,7 +438,7 @@ namespace Password_manager
                     return;
                 }
 
-                // Проверка сложности пароля (опционально)
+                // Проверка сложности пароля
                 if (password.Length < 6)
                 {
                     var result = MessageBox.Show(
@@ -355,5 +510,7 @@ namespace Password_manager
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        #endregion
     }
 }
