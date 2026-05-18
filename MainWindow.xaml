@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Manager_password"
         mc:Ignorable="d"
-        Title="Менеджер паролей" 
+        Title="Менеджер1 паролей" 
         Height="700" Width="1155"
         WindowStartupLocation="CenterScreen"
         Background="#F0F3F4">
